@@ -1,0 +1,13 @@
+version: '3.5'
+
+services:
+  gbc-explorer-exporter:
+    image: raulio/gbc-explorer-prometheus-exporter:main
+    container_name: gbc-explorer-exporter
+    restart: always
+    ports:
+      - "9877:9877"
+    volumes:
+      - ./validators.json:/app/validators.json
+    environment:
+      EXPORTER_PORT: "9877"

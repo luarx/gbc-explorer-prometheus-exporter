@@ -1,0 +1,12 @@
+validators.json
+
+.cache
+.dockerignore
+.gitignore
+.git
+.env
+.pylintrc
+__pycache__
+*.pyc
+*.egg-info
+.idea/
