@@ -1,4 +1,5 @@
 validators.json
+validator_deposit_addresses.json
 
 .cache
 .dockerignore

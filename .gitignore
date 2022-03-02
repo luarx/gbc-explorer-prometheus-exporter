@@ -1,5 +1,6 @@
 # Project specific
 validators.json
+validator_deposit_addresses.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

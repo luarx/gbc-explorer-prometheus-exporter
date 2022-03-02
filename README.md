@@ -5,9 +5,13 @@ Prometheus exporter for various metrics about GBC explorer (https://beacon.gnosi
 
 
 ### Configuration
-#### Validators list
-- Create a file called `validators.json`.
-- Fill that file defining the validators list to generate Prometheus metrics  (use `validators.json.example` as a reference).
+#### Validators list (2 options to define them)
+- Define specific indexes/publickeys:
+  - Create a file called `validators.json`.
+  - Fill that file defining the validators list to generate Prometheus metrics (use `validators.json.example` as a reference).
+- Define deposit keys used to create validators:
+    - Create a file called `validator_deposit_addresses.json`.
+    - Fill that file defining the deposit keys (use `validator_deposit_addresses.json.example` as a reference).
 
 #### ENV VARIABLES
 

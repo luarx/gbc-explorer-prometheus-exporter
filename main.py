@@ -6,6 +6,7 @@ from prometheus_client import start_http_server, Gauge
 import requests
 import json
 import logging
+from pathlib import Path
 
 # Read log level as environment variable (by default INFO)
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
@@ -35,9 +36,14 @@ class AppMetrics:
     application metrics into Prometheus metrics.
     """
 
-    def __init__(self, polling_interval_seconds=5, validators=[]):
+    def __init__(self, polling_interval_seconds=5):
         self.polling_interval_seconds = polling_interval_seconds
-        self.validators = validators
+        self.validators = self.get_validators_list()
+
+        if not self.validators:
+            logging.error(f"Validators list is empty (no validator.json or validator_deposit_address.json file)")
+            # When validators list is empty, does not make sense to continue
+            exit(1)
 
         # Prometheus metrics to collect
         self.validator_effectiveness = Gauge("validator_effectiveness", "Validator efectiviness", ['pubkey', 'validator_index'])
@@ -53,6 +59,56 @@ class AppMetrics:
                 self.fetch_and_set_validators_effectiveness(validators=validator_chunk)
 
             time.sleep(self.polling_interval_seconds)
+
+    def get_validators_list(self):
+        validators_ids_file = "validators.json"
+        validators_deposit_addresses_file = "validator_deposit_addresses.json"
+        # Use a set so that we can discard duplicates between
+        # validators.json and the ones from validators_deposit_addresses.json
+        validators_set = set()
+
+        # Validators list: It could be a list of IDs, pub keys or both
+        if Path(validators_ids_file).exists():
+            logging.info(f"Reading validators.json file...")
+            with open(validators_ids_file, "r") as validators_file:
+                validators = json.load(validators_file)
+
+                logging.info(f"Validators list of indexex/pubkeys: {validators}")
+                # Add validators to validators_set
+                validators_set.update(validators)
+        else:
+            logging.info(f"Not reading validators.json file as it does not exist")
+
+        if Path(validators_deposit_addresses_file).exists():
+            logging.info(f"Reading validator_deposit_addresses.json file...")
+            with open(validators_deposit_addresses_file, "r") as deposit_addresses_file:
+                addresses = json.load(deposit_addresses_file)
+
+                logging.info(f"Deposit addresses: {addresses}")
+
+                for deposit_address in addresses:
+                    resp = requests.get(url=f"https://beacon.gnosischain.com/api/v1/validator/eth1/{deposit_address}",
+                                        timeout=5)
+
+                    response_json = resp.json()
+
+                    # response_json["data"] can be:
+                    # - List. If many validators have been created from the same deposit address
+                    # - Dict. If only 1 validator has been created using the deposit address
+                    response_data = response_json["data"]
+                    if type(response_data) == list:
+                        for validator in response_data:
+                            public_key = validator["publickey"]
+                            logging.info(f"Validator public key {public_key}")
+                            validators_set.add(public_key)
+                    else:
+                        public_key = response_data["publickey"]
+                        logging.info(f"Validator public key {public_key}")
+                        validators_set.add(public_key)
+        else:
+            logging.info(f"Not reading validator_deposit_addresses.json file as it does not exist")
+
+        return list(validators_set)
 
     def set_validator_effectiveness(self, effectiveness):
         """
@@ -79,7 +135,8 @@ class AppMetrics:
             resp = requests.get(url=f"https://beacon.gnosischain.com/api/v1/validator/{validators_serialized}/attestationeffectiveness",
                                 timeout=5)
         except Exception as exception:
-            # Unexpected exception when requesting, but show must go on
+            # Unexpected exception when requesting, but show must go on because in the next loop this request
+            # could work if it is a temporal issue.
             logging.error(f"Exception when requesting validators effectiveness. "
                           f"Exception: {exception} - Validators: {validators}")
             return
@@ -117,20 +174,8 @@ def main():
     polling_interval_seconds = int(os.getenv("POLLING_INTERVAL_SECONDS", "600"))
     exporter_port = int(os.getenv("EXPORTER_PORT", "9877"))
 
-    # Validators list: It could be a list of IDs, pub keys or both
-    logging.info(f"Reading validators.json file...")
-    with open("validators.json", "r") as validators_file:
-        validators = json.load(validators_file)
-        if validators:
-            logging.info(f"Validators: {validators}")
-        else:
-            logging.error(f"Validators list is empty")
-            # When validators list is empty, does not make sense to continue
-            exit(1)
-
     app_metrics = AppMetrics(
-        polling_interval_seconds=polling_interval_seconds,
-        validators=validators
+        polling_interval_seconds=polling_interval_seconds
     )
 
     logging.info(f"Starting Prometheus server - Port: {exporter_port}")
