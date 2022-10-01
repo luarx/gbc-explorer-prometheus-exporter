@@ -54,7 +54,7 @@ class AppMetrics:
         while True:
             # Split validator list in chunks as there could be a rate limit
             # Max 100 https://github.com/gobitfly/eth2-beaconchain-explorer/blob/94ce05e10766196123cb282a557ed07f70339408/handlers/api.go#L919
-            validator_chunks = divide_list_in_chunks(self.validators, 100)
+            validator_chunks = divide_list_in_chunks(self.validators, 50)
             for validator_chunk in validator_chunks:
                 self.fetch_and_set_validators_effectiveness(validators=validator_chunk)
 
